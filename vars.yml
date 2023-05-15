@@ -1,0 +1,7 @@
+provider:
+  ip_address: '{{ inventory_hostname }}'
+  username: api
+  password: Jemuel@123
+
+
+addr_obj: ['10.60.10.70','10.60.10.80']

@@ -1,0 +1,34 @@
+  - name: GATHERING CURRENT DATA OF SECURITY POLICIES FROM FIREWALLS 🔃
+    panos_security_rule_facts:
+       provider: '{{ provider }}'
+       all_details: yes
+    register: secrules1
+    when: CONFIRMATION_REQUIRED | bool
+
+  - name: PERFORMING CLEANUP OF EMPTY ADDRESS GROUPS FROM SECURITY RULES ⚡
+    panos_security_rule:
+       provider: '{{ provider }}'
+       rule_name: '{{ item.rule_name }}'
+       source_ip: '{{ item.source_ip | difference([emtag.name]) }}'
+       destination_ip: '{{ item.destination_ip | difference([emtag.name]) }}'
+    loop: '{{ secrules1.rule_details }}'
+    loop_control:
+       label: '{{ item.rule_name }}'
+    when:
+       - (emtag.name in item.source_ip) or (emtag.name in item.destination_ip)
+       - CONFIRMATION_REQUIRED | bool
+
+  - name: PERFORMING CLEANUP OF THE EMPTY ADDRESS GROUPS FROM FIREWALLS ⚡
+    panos_address_group:
+       provider: '{{ provider }}'
+       name: '{{ emtag.name }}'
+       state: 'absent'
+    loop: '{{ addrgrps1.objects }}'
+    loop_control:
+       label: '{{ emtag.name }}'
+    when:
+      - emtag.static_value == []
+      - CONFIRMATION_REQUIRED | bool
+
+  - debug:
+      msg: "The cleanup of '{{ emtag.name }}' has been completed"

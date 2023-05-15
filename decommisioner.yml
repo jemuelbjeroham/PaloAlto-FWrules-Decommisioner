@@ -1,0 +1,72 @@
+- name: ⚡⚡⚡⚡⚡⚡⚡ DECOMMISIONER (Mark 1) ⚡⚡⚡⚡⚡⚡⚡
+  hosts: all
+  connection: local
+  gather_facts: False
+
+  collections:
+     - paloaltonetworks.panos
+
+  vars_prompt:
+    name: "CONFIRMATION_REQUIRED"
+    prompt: "-------⚡DECOMMISIONER (Mark I)⚡------- \n\n
+             This is an Ansible Playbook developed to automate the process of cleaning up the unused or decommisioned IP addresses from Palo Alto Firewalls. \n\n
+             Product Version:  Mark I r1.0 \n\n
+             Developed by:     Jemuel B Jeroham, B.Sc Design and Computing Student at BITS Pilani \n\n
+             ----------------------------------------- \n\n
+                    !!!!!!! <<<<<<< CAUTION >>>>>>> !!!!!!! \n\n
+             The DECOMMISIONER Playbook will wipe the Security Rules, Address Groups and Address Objects from the firewalls based on the list of Address Objects provided in the variable file. \n\n
+             Incorrect varible file may lead to production impact...!! \n\n
+             So, please ensure that the list of Address Objects provided in the variable file is validated thoroughly...\n\n
+                    !!!!!!! <<<<<<< CAUTION >>>>>>> !!!!!!! \n\n
+             Typing 'yes' will summon the Playbook... Do you wish to proceed ? (yes/no)"
+    default: "no"
+    private: no
+
+  tasks:
+
+  - name: 🔃 INTIALIZING VARIABLES 🔃
+    include_vars: vars.yml
+    when: CONFIRMATION_REQUIRED | bool
+
+  - include_tasks: core1.yml
+    loop: '{{ addr_obj }}'
+    loop_control:
+       loop_var: addrs
+
+  - name: GATHERING DATA OF ADDRESS GROUPS FROM FIREWALLS ⚡
+    panos_object_facts:
+       provider: '{{ provider }}'
+       object_type: 'address-group'
+       name_regex: '.*'
+    register: addrgrps1
+    when: CONFIRMATION_REQUIRED | bool
+
+  - include_tasks: core2.yml
+    loop: '{{ addrgrps1.objects }}'
+    loop_control:
+       loop_var: emtag
+    when:
+      - emtag.static_value == []
+      - CONFIRMATION_REQUIRED | bool
+
+  - name: ACQUIRING SECURITY RULES DATA FROM FIREWALLS AFTER ALL THE CHANGES MADE ⚡
+    panos_security_rule_facts:
+       provider: '{{ provider }}'
+       all_details: yes
+    register: secrules2
+    when: CONFIRMATION_REQUIRED | bool
+
+  - name: REMOVING SECURITY RULES THAT HAS EITHER SOURCE OR DESTINATION FIELD EMPTY ⚡
+    panos_security_rule:
+       provider: '{{ provider }}'
+       rule_name: '{{ item.rule_name }}'
+       state: 'absent'
+    loop: '{{ secrules2.rule_details }}'
+    loop_control:
+       label: '{{ item.rule_name }}'
+    when:
+       - (item.source_ip == []) or (item.destination_ip == [])
+       - CONFIRMATION_REQUIRED | bool
+
+  - debug:
+      msg: "Playbook execution has been completed 🤖"
